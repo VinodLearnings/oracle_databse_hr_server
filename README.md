@@ -1,56 +1,57 @@
 # Oracle HR MCP Server
 
+
+## What is MCP?
+
+**MCP stands for Model Context Protocol.**
+
+MCP is a standard way for an AI application to communicate with external tools and data sources.
+
+Examples of things an AI application can connect to through tools include:
+- Databases
+- Files
+- APIs
+- Business applications
+
+MCP is **not** an LLM, database, or AI model. It is a communication protocol.
+
+
 A Python-based Model Context Protocol (MCP) server that exposes selected Oracle HR database operations as tools. Users can ask employee-related questions in natural language; an LLM selects an approved tool, the MCP client invokes it, and the retrieved records are turned into a readable answer.
 
 [MCP message-pattern specification](https://modelcontextprotocol.io/specification/2026-07-28/basic/patterns/index).
 
 > **Implementation note:** This project description covers the Oracle HR design described in the source material. Remote HTTP hosting, OAuth authentication, resources, prompts, subscriptions, and other protocol features should be treated as future work unless they are implemented in the code.
+## What are we building?
 
-## What it does
+The user asks a question such as:
 
-Ask questions such as:
+> Find the employee details for employee ID 100.
 
-- “Who is employee 100?”
-- “Find employees named Steven.”
-- “Who belongs to department 70?”
-- “Show employees working in the IT department.”
+The AI application uses an LLM to understand the question, calls a tool to retrieve data from Oracle Database, and returns a human-readable answer.
 
-The application uses a fixed set of employee tools instead of letting the LLM generate and execute arbitrary SQL.
+**Flow:**
+
+User → Python Client → Gemma LLM → Select Tool → MCP Client → MCP Server → Employee Tool → Oracle Database → Return Data → LLM → User
 
 ## Architecture
 
 ```mermaid
-flowchart TD
-    U[User question]
-    C[Python client / workflow coordinator]
-    L1[LLM: understand question and select tool]
-    J[Tool-selection JSON]
-    V[Validate tool and input]
-    MC[MCP client]
-    S[MCP server: FastMCP]
-    T[Approved employee tools]
-    DBL[Oracle database access functions]
-    DB[(Oracle HR database)]
-    L2[LLM: format retrieved records]
-    A[Answer displayed to user]
+---
+config:
+  theme: neo
+  layout: elk
+---
+graph TD
+    User["User"]
+    PyClient["Python App<br/>Includes MCP client"]
+    LLM["Gemma LLM<br/>via Hugging Face"]
+    MCPServer["FastMCP Server<br/>Employee tool + Oracle access layer"]
+    OracleDB[("Oracle Database")]
 
-    U --> C
-    C --> L1
-    L1 --> J
-    J --> C
-    C --> V
-    V --> MC
-    MC <-->|MCP request / response| S
-    S --> T
-    T --> DBL
-    DBL -->|Parameterized SQL| DB
-    DB -->|Rows| DBL
-    DBL --> T
-    T --> S
-    S --> MC
-    MC --> C
-    C -->|Original question + results| L2
-    L2 --> A
+    User <-->|"Question / Answer"| PyClient
+    PyClient <-->|"Understand question / Write answer"| LLM
+    PyClient <-->|"Tool request / Employee data"| MCPServer
+    MCPServer <-->|"Parameterized query / Records"| OracleDB
 ```
 
 ### Core design principle
@@ -107,33 +108,23 @@ Tool names and input schemas in this table should match the decorators and funct
 ## Request lifecycle
 
 ```mermaid
-sequenceDiagram
-    actor User
-    participant Client as Python client
-    participant LLM as Gemma via Hugging Face
-    participant MCPClient as MCP client
-    participant Server as FastMCP server
-    participant Tool as Employee tool
-    participant DBLayer as Oracle access layer
-    participant DB as Oracle Database
-
-    User->>Client: Natural-language question
-    Client->>LLM: Question + allowed tool choices
-    LLM-->>Client: Tool name and input as JSON
-    Client->>Client: Parse, validate, allowlist
-    Client->>MCPClient: Call selected tool
-    MCPClient->>Server: JSON-RPC request via MCP
-    Server->>Tool: Dispatch tool call
-    Tool->>DBLayer: Invoke database function
-    DBLayer->>DB: Parameterized SQL query
-    DB-->>DBLayer: Matching rows
-    DBLayer-->>Tool: Structured records
-    Tool-->>Server: Tool result
-    Server-->>MCPClient: JSON-RPC response
-    MCPClient-->>Client: Tool result
-    Client->>LLM: Original question + retrieved records
-    LLM-->>Client: Human-readable answer
-    Client-->>User: Display final answer
+graph TD
+    User[User]--"Natural Language Question"-->PyClient[Python Client]
+    PyClient--"Question + Tool Definitions"-->LLM[Gemma LLM<br/>Hugging Face]
+    LLM--"Selected Tool + Args"-->PyClient
+    PyClient--"Validate & Send Request"-->MCPClient[MCP Client]
+    MCPClient--"Tool Request"-->MCPServer[FastMCP Server]
+    MCPServer--"Invoke Tool"-->EmpTool[Employee Tool]
+    EmpTool--"Execute Query"-->OracleLayer[Oracle Access Layer<br/>Parameterized SQL]
+    OracleLayer--"Query"-->OracleDB[(Oracle Database<br/>Employee Data)]
+    OracleDB--"Result Set"-->OracleLayer
+    OracleLayer--"Records"-->EmpTool
+    EmpTool--"Tool Result"-->MCPServer
+    MCPServer--"Result"-->MCPClient
+    MCPClient--"Data"-->PyClient
+    PyClient--"Question + Data"-->LLM
+    LLM--"Human-Readable Answer"-->PyClient
+    PyClient--"Final Answer"-->User
 ```
 
 ## MCP protocol pattern used
