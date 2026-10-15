@@ -136,7 +136,7 @@ flowchart LR
     C[MCP client] -->|Request: call tool| S[MCP server]
     S -->|Response: result or error| C
 ```
-
+![alt text](image.png)
 Protocol considerations:
 
 - The client initiates requests.
