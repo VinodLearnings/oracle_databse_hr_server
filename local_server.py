@@ -35,5 +35,5 @@ def get_employees_by_department_name(department_name: str):
  
  
 if __name__ == "__main__":
-    mcp.run()
+    mcp.run() # stdio by default means = for local only
  

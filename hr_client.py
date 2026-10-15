@@ -43,18 +43,36 @@ Rules:
   and provide a direct response in value.
 - For greetings or general questions, do not call a tool.
 """
- 
-    response = call_bcai_llm(
-        system_prompt,
-        prompt
-    )
-    # print("LLM Response: before json loadas", response)
+    max_retries = 3
+    routing = None
 
-    response = json.loads(response)
+    for attempt in range(1, max_retries + 1):
+        try:
+            response = call_bcai_llm(
+            system_prompt,
+            prompt
+                )
 
-    # print("LLM Response:", type(response))
- 
-    routing = response
+            print(f"LLM Response (attempt {attempt}):", repr(response))
+
+            routing = json.loads(response)
+
+            if not isinstance(routing, dict):
+                raise ValueError("LLM response must be a JSON object")
+
+            if "tool" not in routing or "value" not in routing:
+                raise ValueError("Missing tool or value in LLM response")
+
+            break# flow is correct and we can get the data from LLM 
+
+        except (json.JSONDecodeError, ValueError, TypeError) as e:
+            print(f"Attempt {attempt} failed: {e}")
+
+        if attempt == max_retries:
+            print("LLM failed after 3 attempts. Please try again.")
+            return
+
+        print("Retrying LLM...")
  
     tool_name = routing["tool"]
     value = routing["value"]
