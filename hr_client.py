@@ -36,17 +36,23 @@ Examples:
 {{"tool":"get_employee_by_id","value":"100"}}
  
 {{"tool":"get_employees_by_department_name","value":"IT"}}
+
+Rules:
+- If the user asks about employee data, select a tool.
+- If no tool is required, return tool as "none"
+  and provide a direct response in value.
+- For greetings or general questions, do not call a tool.
 """
  
     response = call_bcai_llm(
         system_prompt,
         prompt
     )
-    print("LLM Response: before json loadas", response)
+    # print("LLM Response: before json loadas", response)
 
     response = json.loads(response)
 
-    print("LLM Response:", type(response))
+    # print("LLM Response:", type(response))
  
     routing = response
  
@@ -82,6 +88,11 @@ Examples:
                 tool_name,
                 {"department_name": value}
             )
+
+        elif tool_name == "none":
+            print(f"Assistant: ",value)
+            return
+           
  
         else:
  
@@ -92,7 +103,7 @@ Examples:
     # print("\nResult:")
  
  
-    # print(result)
+    print(result)
  
     user_prompt = f"""
 User Question:
